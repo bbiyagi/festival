@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { Festival, Region } from '@/composables/useFestivals'
+import { showToast } from '@/composables/useToast'
 import { supabase } from '@/utils/supabase'
 
 interface FavoriteRow {
@@ -70,13 +71,12 @@ const NOT_READY = '찜한 축제 기능은 아직 준비 중이에요. 조금만
  */
 export const useFavorites = defineStore('favorites', () => {
   const items = ref<Festival[]>([])
-  const error = ref<string | null>(null)
   const ids = computed(() => new Set(items.value.map((f) => f.id)))
   let loaded = false
 
   /** 아직 못 쓰는 기능이면 안내 토스트를 띄운다. */
   function notReady() {
-    error.value = NOT_READY
+    showToast(NOT_READY)
   }
 
   async function load() {
@@ -85,7 +85,7 @@ export const useFavorites = defineStore('favorites', () => {
     if (!session.session) return // 아직 찜한 적 없는 기기
     const { data, error: e } = await supabase.from('favorites').select('*').order('created_at', { ascending: false })
     if (e) {
-      error.value = explain(e)
+      showToast(explain(e))
       return
     }
     items.value = (data as FavoriteRow[]).map(fromRow)
@@ -102,14 +102,13 @@ export const useFavorites = defineStore('favorites', () => {
   async function toggle(f: Festival) {
     if (!ENABLED) return notReady()
     if (!supabase) {
-      error.value = '찜 기능이 설정되지 않았어요. (VITE_SUPABASE_URL)'
+      showToast('찜 기능이 설정되지 않았어요. (VITE_SUPABASE_URL)')
       return
     }
     const saved = ids.value.has(f.id)
     const before = items.value
     // 먼저 화면을 바꾸고, 저장이 실패하면 되돌린다
     items.value = saved ? before.filter((x) => x.id !== f.id) : [f, ...before]
-    error.value = null
     try {
       await ensureUser()
       const { error: e } = saved
@@ -119,9 +118,9 @@ export const useFavorites = defineStore('favorites', () => {
       loaded = true
     } catch (e) {
       items.value = before
-      error.value = explain(e)
+      showToast(explain(e))
     }
   }
 
-  return { enabled: ENABLED, items, error, has: (id: string) => ids.value.has(id), load, toggle, notReady }
+  return { enabled: ENABLED, items, has: (id: string) => ids.value.has(id), load, toggle, notReady }
 })

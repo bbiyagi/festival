@@ -9,6 +9,7 @@ import ScheduleGantt from '@/components/schedule-gantt.vue'
 import { useFestivals, type Kind, type Region } from '@/composables/useFestivals'
 import { useGeolocation } from '@/composables/useGeolocation'
 import { useIntros } from '@/composables/useIntros'
+import { useToast } from '@/composables/useToast'
 import { useFavorites } from '@/stores/favorites'
 import { toIsoDate } from '@/utils/date'
 import {
@@ -60,10 +61,13 @@ const region = computed<Region | null>({
   set: (v) => setQuery({ region: v ?? undefined, selected: undefined }),
 })
 // 기본 정렬: 내 위치를 알면 가까운 순, 모르면 마감 임박순
-const defaultSort = computed<SortKey>(() => (here.value ? 'near' : 'deadline'))
+// 기본 정렬은 늘 가까운 순. 위치를 모르는 동안은 마감 임박순으로 대신 늘어서고, 위치를 허용하라고 알린다.
 const sort = computed<SortKey>({
-  get: () => SORTS.find((s) => s.id === route.query.sort)?.id ?? defaultSort.value,
-  set: (v) => setQuery({ sort: v === defaultSort.value ? undefined : v }),
+  get: () => SORTS.find((s) => s.id === route.query.sort)?.id ?? 'near',
+  set: (v) => {
+    setQuery({ sort: v === 'near' ? undefined : v })
+    if (v === 'near' && !here.value) askLocation()
+  },
 })
 const view = computed<View>({
   get: () => {
@@ -169,15 +173,18 @@ watch(
   { immediate: true },
 )
 
-// 찜 저장 오류는 잠깐 띄웠다가 닫는다
-let toastTimer: ReturnType<typeof setTimeout> | undefined
-watch(
-  () => favorites.error,
-  (e) => {
-    clearTimeout(toastTimer)
-    if (e) toastTimer = setTimeout(() => (favorites.error = null), 6000)
-  },
-)
+// ── 안내 토스트: 위치를 못 쓰면 가까운 순을 위해 위치를 허용하라고 알린다 ──
+const { toast, showToast, hideToast } = useToast()
+function askLocation() {
+  showToast(
+    geo.value === 'denied'
+      ? '가까운 순으로 보려면 위치를 허용해 주세요. 주소창 왼쪽 사이트 설정에서 위치를 켤 수 있어요.'
+      : '내 위치를 아직 몰라서 마감 임박순으로 보여 드려요. 위치를 허용하면 가까운 축제부터 보여 드려요.',
+    { label: '내 위치 찾기', run: locateMe },
+  )
+}
+watch(geo, (s) => (s === 'denied' || s === 'unavailable') && sort.value === 'near' && askLocation())
+watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action && hideToast())
 </script>
 
 <template>
@@ -210,9 +217,9 @@ watch(
           <template v-if="geo === 'locating' || geo === 'idle'">내 위치를 찾는 중…</template>
           <template v-else-if="geo === 'ok'">내 위치에서 가까운 축제부터 보여 드려요.</template>
           <template v-else>
-            {{ geo === 'denied' ? '위치 권한이 없어서' : '위치를 알 수 없어서' }} 마감 임박순으로 보여 드려요.
+            위치를 허용하면 가까운 축제부터 보여 드려요.
             <button type="button" class="min-h-11 cursor-pointer font-bold text-ink underline underline-offset-4 hover:text-accent" @click="locateMe">
-              내 위치 다시 찾기
+              내 위치 찾기
             </button>
           </template>
         </p>
@@ -432,15 +439,23 @@ watch(
     </p>
   </main>
 
-  <!-- 찜 저장 오류 알림 -->
+  <!-- 안내 토스트 (찜·위치) -->
   <Transition enter-from-class="opacity-0 translate-y-4" leave-to-class="opacity-0 translate-y-4">
     <div
-      v-if="favorites.error"
+      v-if="toast"
       role="alert"
       class="fixed inset-x-3 bottom-4 z-20 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lg transition duration-300"
     >
-      <span class="flex-1">{{ favorites.error }}</span>
-      <button type="button" aria-label="알림 닫기" class="flex size-9 flex-none cursor-pointer items-center justify-center rounded-full hover:bg-white/10" @click="favorites.error = null">
+      <span class="flex-1 leading-snug">{{ toast.text }}</span>
+      <button
+        v-if="toast.action"
+        type="button"
+        class="min-h-9 flex-none cursor-pointer rounded-full bg-white px-3.5 text-[13px] font-bold text-ink transition hover:bg-[#FFE8DC] active:scale-95"
+        @click="toast.action.run(); hideToast()"
+      >
+        {{ toast.action.label }}
+      </button>
+      <button type="button" aria-label="알림 닫기" class="flex size-9 flex-none cursor-pointer items-center justify-center rounded-full hover:bg-white/10" @click="hideToast">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
           <path d="M18 6 6 18M6 6l12 12"></path>
         </svg>
