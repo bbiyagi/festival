@@ -1,0 +1,36 @@
+{
+  "name": "festival",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "uv run uvicorn api.index:app --reload --reload-dir api --port 8000 --env-file .env",
+    "dev:web": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "test:api": "uv run pytest",
+    "lint:api": "uv run ruff check . && uv run ruff format --check .",
+    "check:web": "node --experimental-strip-types --no-warnings src/utils/festival.check.ts"
+  },
+  "dependencies": {
+    "@fontsource/black-han-sans": "^5.3.0",
+    "@fontsource/ibm-plex-sans-kr": "^5.3.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "concurrently": "^10.0.5",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

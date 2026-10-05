@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 이번주에 뭐해?: 누군가에게 묻는 말풍선 + 달력 고리 + 물음표 -->
+  <rect width="64" height="64" rx="15" fill="#C2410C"/>
+  <path d="M18 14h28a7 7 0 0 1 7 7v19a7 7 0 0 1-7 7H29l-9 8v-8h-2a7 7 0 0 1-7-7V21a7 7 0 0 1 7-7z" fill="#FFF"/>
+  <rect x="21" y="9" width="5" height="11" rx="2.5" fill="#16181D"/>
+  <rect x="38" y="9" width="5" height="11" rx="2.5" fill="#16181D"/>
+  <path d="M27.2 27.5a5 5 0 1 1 7.4 4.4c-1.7.9-2.6 2-2.6 3.8" fill="none" stroke="#C2410C" stroke-width="4.2" stroke-linecap="round"/>
+  <circle cx="32" cy="41.6" r="2.5" fill="#C2410C"/>
+</svg>
