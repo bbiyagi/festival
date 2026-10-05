@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import logo from '@/assets/logo.svg'
 import { useFavorites } from '@/stores/favorites'
 
 defineEmits<{ openSaved: [] }>()
@@ -11,7 +12,7 @@ const favorites = useFavorites()
       class="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-5 py-2.5 md:px-[clamp(20px,5vw,64px)] md:py-[18px]"
     >
       <RouterLink to="/" class="flex min-h-11 items-center gap-2.5 text-ink no-underline">
-        <img src="/favicon.svg" alt="" class="size-7 md:size-8" />
+        <img :src="logo" alt="" class="size-7 md:size-8" />
         <span class="font-display text-[21px] tracking-[0.5px] md:text-2xl">동네축제</span>
       </RouterLink>
       <nav aria-label="주요 메뉴" class="flex flex-wrap items-center gap-2">
