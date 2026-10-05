@@ -6,7 +6,7 @@ const favorites = useFavorites()
 </script>
 
 <template>
-  <header class="sticky top-0 z-10 border-b border-line bg-card md:static">
+  <header class="sticky top-0 z-40 border-b border-line bg-card md:static">
     <div
       class="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-5 py-2.5 md:px-[clamp(20px,5vw,64px)] md:py-[18px]"
     >

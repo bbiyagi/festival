@@ -116,6 +116,26 @@ function focusSearchOnSlash(e: KeyboardEvent) {
 const views = computed(() => festivals.value.map((f) => toView(f, today, here.value)))
 const searched = computed(() => views.value.filter((f) => matchesQuery(f, q.value)))
 const inWhen = computed(() => searched.value.filter((f) => matchesWhen(f, when.value, today)))
+
+// 내 위치 지역: 가장 가까운 축제의 권역으로 정한다.
+// ponytail: 주소 변환(역지오코딩) 없이 근사. 축제가 드문 곳(섬 등)은 틀릴 수 있다.
+const myRegion = computed<Region | null>(() => {
+  let best: { d: number; r: Region } | null = null
+  for (const f of views.value) {
+    if (f.distanceKm !== null && f.region && (!best || f.distanceKm < best.d)) best = { d: f.distanceKm, r: f.region }
+  }
+  return best?.r ?? null
+})
+
+// 모바일 필터 시트: 언제·분류·정렬. 기본값과 다른 것의 개수를 버튼에 표시
+const sheetEl = ref<HTMLDialogElement>()
+const activeFilters = computed(() => [when.value !== 'all', kind.value !== 'all', sort.value !== 'near'].filter(Boolean).length)
+function resetFilters() {
+  setQuery({ when: undefined, kind: undefined, sort: undefined, selected: undefined })
+}
+function closeSheetOnBackdrop(e: MouseEvent) {
+  if (e.target === sheetEl.value) sheetEl.value?.close()
+}
 // 무엇을: 축제 / 공연 / 전시·박람회 / 행사 (언제 필터를 거친 뒤 개수)
 const kindCounts = computed(() =>
   Object.fromEntries(KINDS.map((k) => [k.id, k.id === 'all' ? inWhen.value.length : inWhen.value.filter((f) => f.kind === k.id).length])),
@@ -193,7 +213,7 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
     <!-- 제목 + 언제 갈까요? -->
     <section
       aria-labelledby="hero-title"
-      class="flex flex-col gap-5 px-2 pt-7 pb-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-7 md:px-0 md:pt-14 md:pb-8"
+      class="flex flex-col gap-5 px-2 pt-5 pb-4 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-7 md:px-0 md:pt-14 md:pb-8"
     >
       <div class="flex min-w-0 flex-col gap-2.5 md:gap-3.5">
         <p class="text-[13px] font-bold text-accent md:text-[15px]" aria-live="polite">
@@ -203,7 +223,7 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
           <h1
             id="hero-title"
             :key="heroTitle"
-            class="font-display text-[32px] leading-[1.2] font-normal whitespace-pre-line transition duration-300 md:min-h-[2.3em] md:text-[clamp(40px,5vw,60px)] md:leading-[1.15]"
+            class="font-display text-[28px] leading-[1.2] font-normal whitespace-pre-line transition duration-300 md:min-h-[2.3em] md:text-[clamp(40px,5vw,60px)] md:leading-[1.15]"
           >
             {{ heroTitle }}
           </h1>
@@ -225,8 +245,8 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
         </p>
       </div>
 
-      <!-- 언제 갈까요?: 선택 배경이 미끄러진다 -->
-      <div class="flex flex-col gap-2">
+      <!-- 언제 갈까요?(PC). 모바일은 필터 시트 안에 -->
+      <div class="hidden flex-col gap-2 md:flex">
         <span id="when-label" class="text-sm font-bold text-sub">언제 갈까요?</span>
         <div role="group" aria-labelledby="when-label" class="relative grid grid-cols-4 rounded-full border border-line bg-card p-1">
           <span
@@ -239,7 +259,7 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
             :key="w.id"
             type="button"
             :aria-pressed="when === w.id"
-            class="relative min-h-11 cursor-pointer rounded-full px-1 text-[13px] font-bold whitespace-nowrap transition-colors duration-300 active:scale-95 md:min-h-12 md:px-5 md:text-[15px]"
+            class="relative min-h-12 cursor-pointer rounded-full px-5 text-[15px] font-bold whitespace-nowrap transition-colors duration-300 active:scale-95"
             :class="when === w.id ? 'text-white' : 'text-ink hover:text-accent'"
             @click="when = w.id"
           >
@@ -249,9 +269,20 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
       </div>
     </section>
 
-    <!-- 검색 + 무엇을 볼까요?(분류) -->
-    <div v-if="view !== 'saved'" class="mb-3 flex flex-col gap-3 md:mb-4 md:flex-row-reverse md:items-center md:justify-between">
-      <div role="search" class="relative md:w-80">
+    <!-- 지역 (내 위치 지역을 맨 앞에) + 정렬(PC) -->
+    <div v-if="view !== 'saved'" class="flex items-center gap-2 pb-3 md:pb-4">
+      <RegionChips v-model="region" :counts="counts" :total="inKind.length" :mine="myRegion" class="min-w-0 flex-1" />
+      <label class="hidden flex-none items-center gap-2 text-sm text-sub md:inline-flex">
+        정렬
+        <select v-model="sort" class="min-h-11 cursor-pointer rounded-[10px] border border-line bg-card px-3 text-[15px] text-ink transition hover:border-ink">
+          <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- 검색 + 분류(PC) / 필터 버튼(모바일) -->
+    <div v-if="view !== 'saved'" class="mb-4 flex items-center gap-2 md:mb-8 md:flex-row-reverse md:justify-between md:gap-3">
+      <div role="search" class="relative min-w-0 flex-1 md:w-80 md:flex-none">
         <label for="festival-search" class="sr-only">축제 검색</label>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-sub">
           <circle cx="11" cy="11" r="7"></circle>
@@ -281,30 +312,38 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
         </button>
         <kbd v-else class="pointer-events-none absolute top-1/2 right-3.5 hidden -translate-y-1/2 rounded border border-line px-1.5 text-xs text-sub md:block">/</kbd>
       </div>
-    <div role="group" aria-label="분류" class="-mx-3 flex gap-1.5 overflow-x-auto px-5 whitespace-nowrap md:mx-0 md:flex-wrap md:px-0">
-      <button
-        v-for="k in KINDS"
-        :key="k.id"
-        type="button"
-        :aria-pressed="kind === k.id"
-        class="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1 rounded-lg px-3 text-sm font-bold transition duration-200 active:scale-95"
-        :class="kind === k.id ? 'bg-accent text-white' : 'bg-[#ECEAE4] text-ink hover:bg-[#E3E0D8]'"
-        @click="kind = k.id"
-      >
-        {{ k.label }}<span class="text-xs font-medium opacity-75">{{ kindCounts[k.id] }}</span>
-      </button>
-    </div>
-    </div>
 
-    <!-- 지역 칩 + 정렬(PC) -->
-    <div v-if="view !== 'saved'" class="flex items-center gap-2 pb-5 md:pb-8">
-      <RegionChips v-model="region" :counts="counts" :total="inKind.length" class="min-w-0 flex-1" />
-      <label class="hidden flex-none items-center gap-2 text-sm text-sub md:inline-flex">
-        정렬
-        <select v-model="sort" class="min-h-11 cursor-pointer rounded-[10px] border border-line bg-card px-3 text-[15px] text-ink transition hover:border-ink">
-          <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
-        </select>
-      </label>
+      <!-- 모바일: 언제·분류·정렬을 시트 하나로 -->
+      <button
+        type="button"
+        class="relative inline-flex min-h-11 flex-none cursor-pointer items-center gap-1.5 rounded-full border px-4 text-sm font-bold transition active:scale-95 md:hidden"
+        :class="activeFilters ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink'"
+        aria-haspopup="dialog"
+        @click="sheetEl?.showModal()"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path>
+          <circle cx="16" cy="6" r="2"></circle>
+          <circle cx="10" cy="12" r="2"></circle>
+          <circle cx="18" cy="18" r="2"></circle>
+        </svg>
+        필터
+        <span v-if="activeFilters" class="flex size-5 items-center justify-center rounded-full bg-accent text-[11px]">{{ activeFilters }}</span>
+      </button>
+
+      <div role="group" aria-label="분류" class="hidden flex-wrap gap-1.5 md:flex">
+        <button
+          v-for="k in KINDS"
+          :key="k.id"
+          type="button"
+          :aria-pressed="kind === k.id"
+          class="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1 rounded-lg px-3 text-sm font-bold transition duration-200 active:scale-95"
+          :class="kind === k.id ? 'bg-accent text-white' : 'bg-[#ECEAE4] text-ink hover:bg-[#E3E0D8]'"
+          @click="kind = k.id"
+        >
+          {{ k.label }}<span class="text-xs font-medium opacity-75">{{ kindCounts[k.id] }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- 목록 / 지도로 보기 / 찜한 축제 탭 -->
@@ -400,13 +439,7 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
           <h2 id="list-title" class="text-[19px] font-bold md:text-2xl">
             {{ kind === 'all' ? '전체' : KINDS.find((k) => k.id === kind)?.label }} 목록 <span class="text-accent">{{ list.length }}</span>
           </h2>
-          <label class="text-[13px] text-sub md:hidden">
-            <span class="sr-only">정렬</span>
-            <select v-model="sort" class="min-h-11 rounded-[10px] border border-line bg-card px-2 text-sm text-ink">
-              <option v-for="s in SORTS" :key="s.id" :value="s.id">{{ s.label }}</option>
-            </select>
-          </label>
-          <span class="hidden text-sm text-sub md:inline">{{ SORTS.find((s) => s.id === sort)?.label }}</span>
+          <span class="text-[13px] text-sub md:text-sm">{{ SORTS.find((s) => s.id === sort)?.label }}</span>
         </div>
 
         <ul :key="animKey" class="flex flex-col gap-2.5 md:grid md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-5">
@@ -439,12 +472,85 @@ watch(geo, (s, prev) => s === 'ok' && prev === 'locating' && toast.value?.action
     </p>
   </main>
 
+  <!-- 모바일 필터 시트 -->
+  <dialog
+    ref="sheetEl"
+    aria-labelledby="sheet-title"
+    class="mx-0 mt-auto mb-0 max-h-[85vh] w-full max-w-none animate-[sheet-up_0.28s_cubic-bezier(0.2,0.8,0.2,1)] rounded-t-3xl bg-card p-0 text-ink backdrop:bg-ink/40 md:hidden"
+    @click="closeSheetOnBackdrop"
+  >
+    <div class="flex flex-col gap-6 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]">
+      <span class="mx-auto h-1 w-10 rounded-full bg-line" aria-hidden="true"></span>
+      <div class="flex items-center justify-between">
+        <h2 id="sheet-title" class="text-lg font-bold">필터</h2>
+        <button v-if="activeFilters" type="button" class="min-h-11 cursor-pointer px-2 text-sm font-bold text-sub underline underline-offset-4" @click="resetFilters">
+          초기화
+        </button>
+      </div>
+
+      <fieldset class="flex flex-col gap-2.5">
+        <legend class="mb-2.5 text-sm font-bold text-sub">언제 갈까요?</legend>
+        <div class="grid grid-cols-4 gap-1.5">
+          <button
+            v-for="w in WHENS"
+            :key="w.id"
+            type="button"
+            :aria-pressed="when === w.id"
+            class="min-h-11 cursor-pointer rounded-xl text-sm font-bold transition active:scale-95"
+            :class="when === w.id ? 'bg-accent text-white' : 'bg-[#ECEAE4] text-ink'"
+            @click="when = w.id"
+          >
+            {{ w.label }}
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="mb-2.5 text-sm font-bold text-sub">무엇을 볼까요?</legend>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="k in KINDS"
+            :key="k.id"
+            type="button"
+            :aria-pressed="kind === k.id"
+            class="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-xl px-3.5 text-sm font-bold transition active:scale-95"
+            :class="kind === k.id ? 'bg-accent text-white' : 'bg-[#ECEAE4] text-ink'"
+            @click="kind = k.id"
+          >
+            {{ k.label }}<span class="text-xs font-medium opacity-75">{{ kindCounts[k.id] }}</span>
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="mb-2.5 text-sm font-bold text-sub">정렬</legend>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button
+            v-for="o in SORTS"
+            :key="o.id"
+            type="button"
+            :aria-pressed="sort === o.id"
+            class="min-h-11 cursor-pointer rounded-xl text-sm font-bold transition active:scale-95"
+            :class="sort === o.id ? 'bg-ink text-white' : 'bg-[#ECEAE4] text-ink'"
+            @click="sort = o.id"
+          >
+            {{ o.label }}
+          </button>
+        </div>
+      </fieldset>
+
+      <button type="button" class="min-h-12 cursor-pointer rounded-full bg-ink font-bold text-white transition active:scale-[0.98]" @click="sheetEl?.close()">
+        축제 {{ list.length }}곳 보기
+      </button>
+    </div>
+  </dialog>
+
   <!-- 안내 토스트 (찜·위치) -->
   <Transition enter-from-class="opacity-0 translate-y-4" leave-to-class="opacity-0 translate-y-4">
     <div
       v-if="toast"
       role="alert"
-      class="fixed inset-x-3 bottom-4 z-20 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lg transition duration-300"
+      class="fixed inset-x-3 bottom-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lg transition duration-300"
     >
       <span class="flex-1 leading-snug">{{ toast.text }}</span>
       <button

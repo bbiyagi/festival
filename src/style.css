@@ -39,6 +39,11 @@
       transform: scale(1.35);
     }
   }
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
   @keyframes pop-in {
     from {
       opacity: 0;

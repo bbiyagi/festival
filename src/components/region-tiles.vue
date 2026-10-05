@@ -18,7 +18,7 @@ function tileClass(id: Region, count: number) {
   <section
     id="regions"
     aria-labelledby="regions-title"
-    class="flex min-w-0 flex-[1_1_340px] flex-col gap-3 rounded-[18px] border border-line bg-card p-4 md:gap-4 md:rounded-[20px] md:p-6"
+    class="hidden min-w-0 flex-[1_1_340px] flex-col gap-3 rounded-[18px] md:flex border border-line bg-card p-4 md:gap-4 md:rounded-[20px] md:p-6"
   >
     <div>
       <h2 id="regions-title" class="text-[17px] font-bold md:mb-1 md:text-xl">지역별로 보기</h2>

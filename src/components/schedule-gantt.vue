@@ -92,8 +92,18 @@ function onScroll() {
   clearTimeout(settleTimer)
   settleTimer = setTimeout(measure, 160)
 }
-onMounted(measure)
-watch(wide, () => requestAnimationFrame(measure))
+const headerEl = ref<HTMLDivElement>()
+const headerH = ref(0)
+onMounted(() => {
+  measure()
+  headerH.value = headerEl.value?.offsetHeight ?? 0
+})
+watch(wide, () =>
+  requestAnimationFrame(() => {
+    measure()
+    headerH.value = headerEl.value?.offsetHeight ?? 0
+  }),
+)
 
 const visible = computed(() => ({
   start: addDays(props.start, winStart.value),
@@ -104,11 +114,12 @@ const inWindow = computed(() =>
 )
 
 // ponytail: 처음엔 일부만 그린다. 축제가 수백 건이면 가상 스크롤로.
-const PREVIEW = 10
+// 모바일은 화면이 짧아서 5줄만 먼저
+const PREVIEW = computed(() => (wide.value ? 10 : 5))
 const expanded = ref(false)
 watch(() => props.list, () => (expanded.value = false))
 const rows = computed(() =>
-  (expanded.value ? inWindow.value : inWindow.value.slice(0, PREVIEW)).map((f) => ({
+  (expanded.value ? inWindow.value : inWindow.value.slice(0, PREVIEW.value)).map((f) => ({
     f,
     bar: barSpan(f, props.start, props.end),
   })),
@@ -117,6 +128,18 @@ const track = computed(() => ({
   gridTemplateColumns: `repeat(${days.value.length}, ${DAY_W.value}px)`,
   width: `${trackW.value}px`,
 }))
+// 모바일: 막대 줄에만 옅은 바탕과 오늘 표시를 그린다 (축제 이름 줄을 가로지르지 않게)
+const mobileTrack = computed(() => {
+  const t = todayIdx.value * DAY_W.value + DAY_W.value / 2
+  return {
+    ...track.value,
+    backgroundColor: '#F3F1EC',
+    backgroundImage:
+      todayIdx.value >= 0
+        ? `linear-gradient(90deg, transparent ${t - 1}px, rgb(194 65 12 / 0.5) ${t - 1}px ${t + 1}px, transparent ${t + 1}px)`
+        : 'none',
+  }
+})
 
 const BAR: Record<Status, string> = {
   ongoing: 'bg-accent',
@@ -185,8 +208,12 @@ function barClass(status: Status, bar: { openStart: boolean; openEnd: boolean })
       @pointercancel="onPointerUp"
     >
       <div class="relative" :style="{ width: `${NAME_W + trackW}px` }">
-        <!-- 배경: 주말 칸, 오늘 세로선 -->
-        <div class="pointer-events-none absolute inset-y-0" :style="{ left: `${NAME_W}px`, width: `${trackW}px` }" aria-hidden="true">
+        <!-- 배경(PC): 주말 칸, 오늘 세로선. 날짜 머리줄은 빼고 축제 행 영역에만 -->
+        <div
+          class="pointer-events-none absolute bottom-0 hidden md:block"
+          :style="{ left: `${NAME_W}px`, width: `${trackW}px`, top: `${headerH}px` }"
+          aria-hidden="true"
+        >
           <template v-for="(d, i) in days" :key="d.iso">
             <div
               v-if="d.dow === 0 || d.dow === 6"
@@ -202,7 +229,7 @@ function barClass(status: Status, bar: { openStart: boolean; openEnd: boolean })
         </div>
 
         <!-- 날짜 머리줄 -->
-        <div class="relative flex border-b border-line" aria-hidden="true">
+        <div ref="headerEl" class="relative flex border-b border-line" aria-hidden="true">
           <div
             class="sticky left-0 z-10 hidden flex-none items-end self-stretch bg-card pr-4 pb-2 text-[13px] text-sub md:flex"
             :style="{ width: `${NAME_W}px` }"
@@ -246,7 +273,7 @@ function barClass(status: Status, bar: { openStart: boolean; openEnd: boolean })
                 <span class="hidden md:inline">{{ f.place }} · {{ f.range }}</span>
               </span>
             </div>
-            <div class="grid h-2.5 md:h-[22px]" :style="track">
+            <div class="grid h-2.5 rounded-full md:h-[22px] md:rounded-none" :style="wide ? track : mobileTrack">
               <div
                 class="relative h-2.5 origin-left animate-bar-grow cursor-pointer transition-[filter] group-hover:brightness-110 md:h-[22px]"
                 :class="barClass(f.status, bar)"
