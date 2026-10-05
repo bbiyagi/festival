@@ -114,7 +114,7 @@ async function init() {
     center: new maps.LatLng(KOREA.lat, KOREA.lng),
     zoom: KOREA.zoom,
     zoomControl: true,
-    zoomControlOptions: { position: maps.Position.TOP_RIGHT },
+    zoomControlOptions: { position: maps.Position.RIGHT_CENTER }, // 오른쪽 위는 "내 위치" 버튼 자리
     mapDataControl: false,
     scaleControl: false,
   })
