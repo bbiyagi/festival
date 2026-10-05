@@ -10,7 +10,7 @@ from pydantic.alias_generators import to_camel
 from api import festival_rules as rules
 from api import tourapi
 
-app = FastAPI(title="이번주에 뭐해? API")
+app = FastAPI(title="동네축제 API")
 
 MAX_RANGE_DAYS = 62
 CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400"

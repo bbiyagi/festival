@@ -12,7 +12,7 @@ const favorites = useFavorites()
     >
       <RouterLink to="/" class="flex min-h-11 items-center gap-2.5 text-ink no-underline">
         <img src="/favicon.svg" alt="" class="size-7 md:size-8" />
-        <span class="font-display text-[21px] tracking-[0.5px] md:text-2xl">이번주에 뭐해?</span>
+        <span class="font-display text-[21px] tracking-[0.5px] md:text-2xl">동네축제</span>
       </RouterLink>
       <nav aria-label="주요 메뉴" class="flex flex-wrap items-center gap-2">
         <a href="#overview" class="hidden px-3.5 py-2.5 text-[15px] font-bold text-ink no-underline md:inline">일정 한눈에</a>
